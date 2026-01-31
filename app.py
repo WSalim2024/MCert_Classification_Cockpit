@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 # --- PAGE CONFIG ---
@@ -31,7 +32,7 @@ def preprocess_data(df):
     # Split 80/20
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Scale data (Critical for SVM/Logistic Regression)
+    # Scale data (Critical for KNN/SVM)
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
@@ -42,7 +43,7 @@ def preprocess_data(df):
 # --- UI HEADER ---
 st.title("🔬 MCert Classification Cockpit")
 st.markdown(
-    "Compare **Logistic Regression**, **Decision Trees**, and **SVM** on the Breast Cancer Wisconsin Diagnostic Dataset.")
+    "Compare **Logistic Regression**, **Decision Trees**, **SVM**, and **KNN** on the Breast Cancer Wisconsin Diagnostic Dataset.")
 st.markdown("---")
 
 # Load Data
@@ -65,12 +66,20 @@ with col1:
     st.subheader("⚙️ Model Configuration")
     model_choice = st.radio(
         "Select Algorithm:",
-        ["Logistic Regression", "Decision Tree", "Support Vector Machine (SVM)"]
+        ["Logistic Regression", "Decision Tree", "Support Vector Machine (SVM)", "K-Nearest Neighbors (KNN)"]
     )
 
-    # NEW: Tree Depth Control (Visual clarity)
+    # HYPERPARAMETER TUNING SECTION
+    st.markdown("---")
+    st.write("**Hyperparameter Tuning**")
+
     if model_choice == "Decision Tree":
-        max_depth = st.slider("Max Tree Depth (for visualization)", 1, 5, 3)
+        max_depth = st.slider("Max Tree Depth", 1, 10, 3)
+        st.caption("Controls complexity vs. overfitting.")
+
+    elif model_choice == "K-Nearest Neighbors (KNN)":
+        k_neighbors = st.slider("Number of Neighbors (K)", 1, 21, 5, step=2)
+        st.caption("Lower K = More sensitive to noise. Higher K = Smoother boundaries.")
 
     run_btn = st.button("🚀 Train & Evaluate", type="primary")
 
@@ -87,10 +96,12 @@ with col2:
             if model_choice == "Logistic Regression":
                 model = LogisticRegression()
             elif model_choice == "Decision Tree":
-                # Use selected depth to keep chart readable
                 model = DecisionTreeClassifier(max_depth=max_depth if 'max_depth' in locals() else 3)
-            else:
+            elif model_choice == "Support Vector Machine (SVM)":
                 model = SVC()
+            else:
+                # NEW: KNN Model
+                model = KNeighborsClassifier(n_neighbors=k_neighbors if 'k_neighbors' in locals() else 5)
 
             # 3. Train Model
             model.fit(X_train, y_train)
@@ -115,14 +126,21 @@ with col2:
         # 5. Visualization
         st.markdown("---")
 
-        # NEW: Conditional Visualization
         if model_choice == "Decision Tree":
             st.subheader("🌳 Decision Tree Logic Flow")
             fig, ax = plt.subplots(figsize=(20, 10))
             plot_tree(model, filled=True, feature_names=feature_names, class_names=target_names, fontsize=10)
             st.pyplot(fig)
+        elif model_choice == "K-Nearest Neighbors (KNN)":
+            st.subheader("📉 Confusion Matrix (KNN)")
+            st.info(f"Using {k_neighbors} Nearest Neighbors to classify.")
+            cm = confusion_matrix(y_test, y_pred)
+            fig, ax = plt.subplots(figsize=(6, 4))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=target_names, yticklabels=target_names)
+            plt.ylabel('Actual')
+            plt.xlabel('Predicted')
+            st.pyplot(fig)
         else:
-            # Standard Confusion Matrix for others
             st.subheader("📉 Confusion Matrix")
             cm = confusion_matrix(y_test, y_pred)
             fig, ax = plt.subplots(figsize=(6, 4))
